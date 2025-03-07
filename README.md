@@ -26,6 +26,10 @@ El modo de juego que el simulador debe poder manejar es únicamente commander. E
  - Habilidades pasivas
  - State based actions
 
+ ### CARTAS:
+Creamos una clase Card para guardar la estructura general de las cartas.
+Es importante tener una notacion clara para los costes de maná. Hay 7 tipos de maná en magic: rojo (R), verde (G), blanco (W), negro (B), azul (U), incoloro (C) y genérico (N). El maná genérico puede ser pagado con maná de cualquier color o incoloro.
+
 # Instrucciones para Ejecutar el Proyecto
 
 ...     
