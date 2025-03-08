@@ -2,12 +2,47 @@ from Card import Card
 from Player import Player
 from Game import Game
 
+from Card import Card
+from Player import Player
+from Game import Game
+
 def create_test_deck():
-    """Crea un mazo de prueba con cartas básicas."""
+    """Crea un mazo de prueba con cartas básicas, incluyendo habilidades pasivas."""
     return [
-        Card(name="Llanowar Elves", mana_cost={}, card_types=["Creature"], subtypes=["Elf", "Druid"], text="{T}: Add {G}.", power=1, toughness=1, keyword_actions=["Tap"]),
-        Card(name="Lightning Bolt", mana_cost={}, card_types=["Instant"], subtypes=[], text="Deal 3 damage to any target.")
-    ] * 30  # Copia de cartas para un mazo de 60
+        Card(
+            name="Llanowar Elves", 
+            mana_cost={}, 
+            card_types=["Creature"], 
+            subtypes=["Elf", "Druid"], 
+            text="{T}: Add {G}.", 
+            power=1, 
+            toughness=1,
+            activated_abilities=["{T}: Add {G}"]
+        ),
+        Card(
+            name="Glorious Anthem", 
+            mana_cost={}, 
+            card_types=["Enchantment"], 
+            subtypes=[], 
+            text="Las criaturas que controlas obtienen +1/+1.", 
+            passive_effects={"buff": {"power": 1, "toughness": 1}}
+        ),
+        Card(
+            name="Vanquisher's Banner", 
+            mana_cost={}, 
+            card_types=["Artifact"], 
+            subtypes=[], 
+            text="Las criaturas de un tipo elegido obtienen +1/+1.", 
+            passive_effects={"buff": {"power": 1, "toughness": 1}}
+        ),
+        Card(
+            name="Lightning Bolt", 
+            mana_cost={}, 
+            card_types=["Instant"], 
+            subtypes=[], 
+            text="Deal 3 damage to any target."
+        )
+    ] * 15  # Mazo de prueba con 60 cartas en total
 
 # Crear jugadores
 player1 = Player(name="Jugador 1", deck=create_test_deck())

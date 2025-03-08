@@ -13,7 +13,8 @@ class Card:
                  power: int = None, toughness: int = None, loyalty: int = None,
                  keywords: list = None, keyword_actions: list = None, expansion: str = None, rarity: str = None,
                  image: str = None, color_indicator: list = None, expansion_symbol: str = None,
-                 collector_number: int = None, flavor_text: str = None, frame_effects: list = None):
+                 collector_number: int = None, flavor_text: str = None, frame_effects: list = None,
+                 passive_effects: dict = None, activated_abilities: list = None, triggered_abilities: list = None):
         """
         Clase base para representar una carta de Magic: The Gathering.
 
@@ -69,6 +70,9 @@ class Card:
         self.collector_number = collector_number
         self.flavor_text = flavor_text
         self.frame_effects = frame_effects if frame_effects else []
+        self.passive_effects = passive_effects if passive_effects else {}
+        self.activated_abilities = activated_abilities if activated_abilities else []
+        self.triggered_abilities = triggered_abilities if triggered_abilities else []
 
     def __str__(self):
         mana_cost_str = " ".join(f"{k}:{v}" for k, v in self.mana_cost.items() if v > 0)
