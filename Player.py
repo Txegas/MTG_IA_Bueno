@@ -22,6 +22,11 @@ class Player:
         self.mana_pool = {"R": 0, "G": 0, "W": 0, "B": 0, "U": 0, "C": 0, "N": 0}  # Reserva de maná disponible
         self.counters = {}  # Contadores en el jugador
         self.turn_priority = False  # Indica si el jugador tiene la prioridad en el turno actual
+        self.lands_played_this_turn = 0  # Contador de tierras jugadas este turno
+
+    def reset_turn_lands(self):
+        """Resetea el contador de tierras jugadas al inicio de cada turno."""
+        self.lands_played_this_turn = 0
         
     def draw_card(self, num: int = 1):
         """Robar cartas de la biblioteca."""
@@ -32,15 +37,35 @@ class Player:
                 print(f"{self.name} intenta robar una carta, pero su biblioteca está vacía.")
                 # En reglas oficiales, si un jugador intenta robar de un mazo vacío, pierde el juego
     
-    def play_card(self, card: Card):
-        """Jugar una carta de la mano si tiene el maná necesario."""
-        if card in self.hand and self.can_pay_mana(card.mana_cost):
+    def play_card(self, card, game_phase: str):
+        """Jugar una carta de la mano si se cumplen las reglas del juego."""
+
+        if "Land" in card.card_types and self.lands_played_this_turn >= 1:
+            print(f"{self.name} ya ha jugado una tierra este turno y no puede jugar otra.")
+            return  # Evita que la tierra sea jugada
+    
+        if card in self.hand and self.can_play_card(card, game_phase) and self.can_pay_mana(card.mana_cost):
             self.hand.remove(card)
-            self.battlefield.append(card)
+            if "Land" in card.card_types:
+                self.lands_played_this_turn += 1
             self.pay_mana(card.mana_cost)
             print(f"{self.name} juega {card.name}.")
         else:
             print(f"{self.name} no puede jugar {card.name}.")
+
+    def can_play_card(self, card, game_phase: str) -> bool:
+        """Verifica si el jugador puede jugar una carta dadas las reglas del juego."""
+        if "Land" in card.card_types:
+            if self.lands_played_this_turn >= 1:
+                print(f"{self.name} ya ha jugado una tierra este turno y no puede jugar otra.")
+                return False
+        
+        if "Instant" not in card.card_types and "Flash" not in card.keywords:
+            if game_phase not in ["Precombat Main Phase", "Postcombat Main Phase"]:
+                print(f"{self.name} solo puede jugar {card.name} en la fase principal.")
+                return False
+            
+        return True
     
     def can_pay_mana(self, mana_cost: dict) -> bool:
         """Verifica si el jugador tiene suficiente maná para pagar el coste de una carta."""

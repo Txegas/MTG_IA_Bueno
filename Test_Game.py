@@ -7,11 +7,27 @@ from Player import Player
 from Game import Game
 
 def create_test_deck():
-    """Crea un mazo de prueba con cartas básicas, incluyendo habilidades pasivas."""
+    """Crea un mazo de prueba con tierras rojas y verdes, Llanowar Elves y Lightning Bolt."""
     return [
         Card(
-            name="Llanowar Elves", 
+            name="Mountain", 
             mana_cost={}, 
+            card_types=["Land"], 
+            subtypes=["Mountain"], 
+            text="{T}: Add {R}.",
+            activated_abilities=["{T}: Add {R}"]
+        ),
+        Card(
+            name="Forest", 
+            mana_cost={}, 
+            card_types=["Land"], 
+            subtypes=["Forest"], 
+            text="{T}: Add {G}.",
+            activated_abilities=["{T}: Add {G}"]
+        ),
+        Card(
+            name="Llanowar Elves", 
+            mana_cost={"G": 1}, 
             card_types=["Creature"], 
             subtypes=["Elf", "Druid"], 
             text="{T}: Add {G}.", 
@@ -20,29 +36,13 @@ def create_test_deck():
             activated_abilities=["{T}: Add {G}"]
         ),
         Card(
-            name="Glorious Anthem", 
-            mana_cost={}, 
-            card_types=["Enchantment"], 
-            subtypes=[], 
-            text="Las criaturas que controlas obtienen +1/+1.", 
-            passive_effects={"buff": {"power": 1, "toughness": 1}}
-        ),
-        Card(
-            name="Vanquisher's Banner", 
-            mana_cost={}, 
-            card_types=["Artifact"], 
-            subtypes=[], 
-            text="Las criaturas de un tipo elegido obtienen +1/+1.", 
-            passive_effects={"buff": {"power": 1, "toughness": 1}}
-        ),
-        Card(
             name="Lightning Bolt", 
-            mana_cost={}, 
+            mana_cost={"R": 1}, 
             card_types=["Instant"], 
             subtypes=[], 
             text="Deal 3 damage to any target."
         )
-    ] * 15  # Mazo de prueba con 60 cartas en total
+    ] * 15  # Mazo con 60 cartas en total
 
 # Crear jugadores
 player1 = Player(name="Jugador 1", deck=create_test_deck())

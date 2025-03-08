@@ -49,31 +49,36 @@ class Game:
             self.turn_player_index = (self.turn_player_index + 1) % len(self.players)
     
     def execute_turn(self, player: Player):
-        """Ejecuta las fases del turno para un jugador."""
-        self.untap_phase(player)
-        self.priority_cycle()
-        self.upkeep_phase(player)
-        self.priority_cycle()
-        self.draw_phase(player)
-        self.priority_cycle()
-        self.main_phase(player, phase="Precombat Main Phase")
-        self.priority_cycle()
-        self.combat_phase(player)
-        self.priority_cycle()
-        self.main_phase(player, phase="Postcombat Main Phase")
-        self.priority_cycle()
-        self.end_phase(player)
-        self.priority_cycle()
+        """Ejecuta las fases del turno para un jugador, permitiendo múltiples acciones en cada fase hasta que el jugador decida continuar."""
+        player.reset_turn_lands()
+        self.phase_loop(player, "Untap", self.untap_phase)
+        self.phase_loop(player, "Upkeep", self.upkeep_phase)
+        self.phase_loop(player, "Draw", self.draw_phase)
+        self.phase_loop(player, "Precombat Main Phase", lambda p: self.main_phase(p, "Precombat Main Phase"))
+        self.phase_loop(player, "Combat", self.combat_phase)
+        self.phase_loop(player, "Postcombat Main Phase", lambda p: self.main_phase(p, "Postcombat Main Phase"))
+        self.phase_loop(player, "End", self.end_phase)
+    
+    def phase_loop(self, player: Player, phase_name: str, phase_function):
+        """Permite que un jugador realice múltiples acciones en una fase hasta que indique que quiere avanzar."""
+        self.phase = phase_name
+        print(f"{player.name} está en la fase de {phase_name}.")
+        phase_function(player)
+        while True:
+            self.priority_cycle()
+            advance = input(f"{player.name}, ¿quieres pasar a la siguiente fase? (s/n): ")
+            if advance.lower() == "s":
+                break
     
     def untap_phase(self, player: Player):
         """Fase de enderezar: Se enderezan todas las permanentes del jugador."""
         self.phase = "Untap"
-        print(f"{player.name} está en la fase de Enderezar.")
+        #print(f"{player.name} está en la fase de Enderezar.")
     
     def upkeep_phase(self, player: Player):
         """Fase de mantenimiento: Se resuelven habilidades disparadas."""
         self.phase = "Upkeep"
-        print(f"{player.name} está en la fase de Mantenimiento.")
+        #print(f"{player.name} está en la fase de Mantenimiento.")
     
     def draw_phase(self, player: Player):
         """Fase de robo: El jugador roba una carta o pierde si su biblioteca está vacía."""
@@ -85,24 +90,28 @@ class Game:
             player.draw_card()
             print(f"{player.name} ha robado una carta.")
         self.check_state_based_actions()
+        self.check_triggered_abilities("draw", player)
     
     def main_phase(self, player: Player, phase: str):
         """Fase principal: Se pueden jugar tierras, lanzar hechizos y activar habilidades."""
         self.phase = phase
-        print(f"{player.name} está en la {phase}.")
+        #print(f"{player.name} está en la {phase}.")
         self.check_state_based_actions()
+        self.check_triggered_abilities("main_phase", player)
     
     def combat_phase(self, player: Player):
         """Fase de combate: Se declara ataque y bloqueos."""
         self.phase = "Combat"
-        print(f"{player.name} está en la fase de combate.")
+        #print(f"{player.name} está en la fase de combate.")
         self.check_state_based_actions()
+        self.check_triggered_abilities("main_phase", player)
     
     def end_phase(self, player: Player):
         """Fase final: Se resuelven efectos de final de turno y se descartan cartas si es necesario."""
         self.phase = "End"
-        print(f"{player.name} está en la fase de final de turno.")
+        #print(f"{player.name} está en la fase de final de turno.")
         self.check_state_based_actions()
+        self.check_triggered_abilities("main_phase", player)
     
     def is_game_over(self) -> bool:
         """Verifica si la partida ha terminado."""
@@ -111,9 +120,12 @@ class Game:
     def priority_cycle(self):
         """Gestiona la prioridad entre los jugadores para jugar hechizos y habilidades."""
         print(f"Se ha activado el ciclo de prioridad en la fase {self.phase}.")
+        current_player = self.players[self.turn_player_index]  # Jugador en turno
+        players_in_priority_order = self.players[self.turn_player_index:] + self.players[:self.turn_player_index]  # Rota la prioridad
+        
         while True:
             passed_players = 0
-            for player in self.players:
+            for player in players_in_priority_order:
                 action = self.get_player_action(player)
                 if action:
                     self.stack.append(action)
@@ -126,35 +138,80 @@ class Game:
             
             if passed_players == len(self.players):
                 break  # Si todos pasan, se avanza la fase
+
         self.resolve_stack()
         self.check_state_based_actions()
 
     def get_player_action(self, player: Player):
-        """Permite a un jugador jugar un hechizo o activar una habilidad si tiene suficiente maná."""
+        """Permite a un jugador jugar un hechizo o activar una habilidad si tiene suficiente maná y cumple las restricciones del juego."""
         if not player.hand and not any(card.activated_abilities for card in player.battlefield):
-            return None
+            return None # Si no tiene cartas en la mano ni habilidades disponibles, no puede hacer nada
         
-        response = input(f"{player.name}, ¿quieres jugar un hechizo o activar una habilidad? (h/a/n): ")
-        if response.lower() == 'h':
-            card_to_play = player.hand[0]  # Por ahora, jugamos la primera carta en mano
-            if player.can_pay_mana(card_to_play.mana_cost):
-                player.pay_mana(card_to_play.mana_cost)
-                player.hand.remove(card_to_play)
-                return StackObject(card=card_to_play, controller=player)
+        while True:
+            response = input(f"{player.name}, ¿quieres jugar un hechizo o activar una habilidad? (h/a/n): ")
+            
+            if response.lower() == 'h':
+                for i, card in enumerate(player.hand):
+                    print(f"{i+1}. {card.name} - {card.card_types}")
+                choice = input(f"Selecciona una carta para jugar (1-{len(player.hand)}): ")
+                if choice.isdigit():
+                    index = int(choice) - 1
+                    if 0 <= index < len(player.hand):
+                        card_to_play = player.hand[index]
+
+                        # Solo se pueden jugar permanentes sin flash en el turno del jugador
+                        if player != self.players[self.turn_player_index]:  # Si no es su turno
+                            if "Instant" not in card_to_play.card_types and "Flash" not in card_to_play.keywords:
+                                print(f"{player.name} solo puede jugar {card_to_play.name} en su propio turno.")
+                                continue  # Volvemos a preguntar
+
+                        # Verificación de si ya se jugó una tierra este turno antes de meterla en el stack
+                        if "Land" in card_to_play.card_types and player.lands_played_this_turn >= 1:
+                            print(f"{player.name} ya ha jugado una tierra este turno y no puede jugar otra.")
+                            continue   # VOLVEMOS A PREGUNTAR AL JUGADOR
+                    
+                        if player.can_play_card(card_to_play, self.phase):
+                            if player.can_pay_mana(card_to_play.mana_cost):
+                                player.pay_mana(card_to_play.mana_cost)
+                                player.hand.remove(card_to_play)
+                                
+                                # Si la carta es una tierra, actualizamos el contador inmediatamente
+                                if "Land" in card_to_play.card_types:
+                                    player.lands_played_this_turn += 1
+
+                                return StackObject(card=card_to_play, controller=player)
+                            else:
+                                print(f"{player.name} no tiene suficiente maná para jugar {card_to_play.name}.")
+                                continue  
+                        else:
+                            print(f"{player.name} no puede jugar {card_to_play.name} en esta fase.")
+                            continue
+
+            elif response.lower() == 'a':
+                available_cards = [card for card in player.battlefield if card.activated_abilities and not card.is_tapped]
+
+                if not available_cards:
+                    print("No hay cartas con habilidades activadas disponibles.")
+                    continue
+
+                for i, card in enumerate(available_cards):
+                    print(f"{i+1}. {card.name} - {card.activated_abilities}")
+
+                ability_choice = input(f"Selecciona una habilidad para activar (1-{len(available_cards)}): ")
+                
+                if ability_choice.isdigit():
+                    index = int(ability_choice) - 1
+                    if 0 <= index < len(available_cards):
+                        selected_card = available_cards[index]
+                        ability = selected_card.activated_abilities[0]  # Asumiendo que tiene una sola habilidad activada
+                        print(f"{player.name} activa {ability} de {selected_card.name}.")
+                        return StackObject(card=selected_card, controller=player, ability=ability)
+
+            elif response.lower() == 'n':
+                return None  # Solo en este caso se permite que la prioridad pase al siguiente jugador
+
             else:
-                print(f"{player.name} no tiene suficiente maná para jugar {card_to_play.name}.")
-        elif response.lower() == 'a':
-            for card in player.battlefield:
-                if card.activated_abilities:
-                    print(f"Habilidades de {card.name}: {card.activated_abilities}")
-                    ability_choice = input(f"Selecciona una habilidad de {card.name} para activar (1-{len(card.activated_abilities)}): ")
-                    if ability_choice.isdigit():
-                        ability_index = int(ability_choice) - 1
-                        if 0 <= ability_index < len(card.activated_abilities):
-                            ability = card.activated_abilities[ability_index]
-                            print(f"{player.name} activa {ability} de {card.name}.")
-                            return StackObject(card=card, controller=player, ability=ability)  # Se activa en la pila
-        return None
+                print("Entrada no válida. Debes seleccionar 'h', 'a' o 'n'.")
     
     def check_state_based_actions(self):
         """Verifica y aplica las reglas de State-Based Actions (SBAs)."""
@@ -168,6 +225,15 @@ class Game:
                     print(f"{card.name} ha sido destruida por tener 0 o menos de resistencia.")
                     player.battlefield.remove(card)
                     player.graveyard.append(card)
+
+    def check_triggered_abilities(self, event: str, player: Player, target: Player = None):
+        """Verifica si hay habilidades disparadas debido a un evento y las coloca en la pila."""
+        for p in self.players:
+            for card in p.battlefield:
+                if event in card.triggered_abilities:
+                    ability = card.triggered_abilities[event]
+                    print(f"{card.name} de {p.name} se dispara debido a {event}.")
+                    self.stack.append(StackObject(card=card, controller=p, target=target, ability=ability))
     
     def resolve_stack(self):
         """Resuelve los hechizos y habilidades en la pila."""

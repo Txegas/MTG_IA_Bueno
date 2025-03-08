@@ -19,11 +19,25 @@ class StackObject:
     def resolve(self):
         """Resuelve el efecto del hechizo o habilidad."""
         if self.ability:
-            print(f"Resolviendo habilidad activada de {self.card.name}: {self.ability}.")
-            # HABILIDADES DE MANA:
-            if self.ability == "{T}: Add {G}":
-                self.controller.add_mana("G", 1)
-                print(f"{self.controller.name} agrega 1 Maná verde a su reserva de maná.")
+            print(f"Resolviendo habilidad de {self.card.name}: {self.ability}.")
+
+            # Verificar si la habilidad requiere girar ({T}) para activarse
+            if "{T}" in self.ability:
+                if not self.card.is_tapped:
+                    self.card.is_tapped = True
+                    print(f"{self.card.name} se gira para activar su habilidad.")
+                else:
+                    print(f"{self.card.name} ya está girada y no puede activarse nuevamente.")
+                    return
+            
+            # Manejo de habilidades de generación de maná
+            if "Add" in self.ability:
+                mana_generated = self.ability.split("Add")[-1].strip(" {}.")
+                for symbol in mana_generated:
+                    if symbol in self.controller.mana_pool:
+                        self.controller.add_mana(symbol, 1)
+                        print(f"{self.controller.name} agrega 1 maná {symbol} a su reserva.")
+            
             else:
                 print(f"Efecto de habilidad activada '{self.ability}' aún no implementado.")
         else:
@@ -32,7 +46,7 @@ class StackObject:
                 if self.target:
                     self.target.lose_life(3)
                     print(f"{self.target.name} recibe 3 puntos de daño.")
-            elif "Creature" or "enchantment" in self.card.card_types:
+            elif "Creature" or "Land" in self.card.card_types:
                 self.controller.battlefield.append(self.card)
                 print(f"{self.controller.name} pone {self.card.name} en el campo de batalla.")
             else:
