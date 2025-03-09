@@ -30,6 +30,7 @@ class Player:
         
     def draw_card(self, num: int = 1):
         """Robar cartas de la biblioteca."""
+        print(f"{self.name} ha robado {num} carta(s).")
         for _ in range(num):
             if self.library:
                 self.hand.append(self.library.pop(0))
@@ -46,10 +47,20 @@ class Player:
     
         if card in self.hand and self.can_play_card(card, game_phase) and self.can_pay_mana(card.mana_cost):
             self.hand.remove(card)
+
+            # Si la carta es un permanente, se pone en el campo de batalla y se le asigna un controlador
+            if "Creature" in card.card_types or "Land" in card.card_types or "Artifact" in card.card_types or "Enchantment" in card.card_types:
+
+                card.controller = self  # Se asigna el controlador
+                self.battlefield.append(card)
+
+            # Si la carta es una tierra, guardamos que el jugador ya ha jugado su tierra de turno
             if "Land" in card.card_types:
                 self.lands_played_this_turn += 1
+
             self.pay_mana(card.mana_cost)
             print(f"{self.name} juega {card.name}.")
+
         else:
             print(f"{self.name} no puede jugar {card.name}.")
 

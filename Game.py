@@ -1,6 +1,7 @@
 from Player import Player
 from StackObject import StackObject
 from collections import deque
+from Card import Card
 
 class Game:
     def __init__(self, players: list):
@@ -26,20 +27,6 @@ class Game:
             player.draw_card(7)
             print(f"{player.name} ha robado su mano inicial.")
 
-    def apply_passive_effects(self, player: Player, card):
-        """Aplica los efectos pasivos de una carta cuando entra al campo de batalla."""
-        if not card.passive_effects:
-            return
-
-        for effect, details in card.passive_effects.items():
-            if effect == "buff":
-                for target in self.players:
-                    for creature in target.battlefield:
-                        if "Creature" in creature.card_types:
-                            creature.power += details.get("power", 0)
-                            creature.toughness += details.get("toughness", 0)
-                            print(f"{creature.name} obtiene +{details.get('power', 0)}/+{details.get('toughness', 0)} gracias a {card.name}.")
-
     def turn_cycle(self):
         """Controla el ciclo de turnos de la partida."""
         while not self.is_game_over():
@@ -47,10 +34,20 @@ class Game:
             print(f"\nEs el turno de {current_player.name}")
             self.execute_turn(current_player)
             self.turn_player_index = (self.turn_player_index + 1) % len(self.players)
-    
+
+    def is_game_over(self) -> bool:
+        """Verifica si la partida ha terminado."""
+        return len(self.players) <= 1
+
     def execute_turn(self, player: Player):
-        """Ejecuta las fases del turno para un jugador, permitiendo múltiples acciones en cada fase hasta que el jugador decida continuar."""
+        """
+        Ejecuta las fases del turno para un jugador, permitiendo múltiples acciones en cada fase hasta que el jugador decida continuar.
+        
+        :param player: Jugador cuyo turno se está jugando
+        """
+        # DEBUG: No se si esto aqui, deberian resetearse las tierras jugadas por todos os jugadores al principio de cada turno, aunque no sea su turno
         player.reset_turn_lands()
+
         self.phase_loop(player, "Untap", self.untap_phase)
         self.phase_loop(player, "Upkeep", self.upkeep_phase)
         self.phase_loop(player, "Draw", self.draw_phase)
@@ -58,70 +55,72 @@ class Game:
         self.phase_loop(player, "Combat", self.combat_phase)
         self.phase_loop(player, "Postcombat Main Phase", lambda p: self.main_phase(p, "Postcombat Main Phase"))
         self.phase_loop(player, "End", self.end_phase)
-    
+
     def phase_loop(self, player: Player, phase_name: str, phase_function):
-        """Permite que un jugador realice múltiples acciones en una fase hasta que indique que quiere avanzar."""
+        """
+        Permite que un jugador realice múltiples acciones en una fase hasta que indique que quiere avanzar.
+        
+        :param player: Jugador cuyo turno se está jugando
+        :param phase_name: Nombre de la fase actual (str)
+        :param phase_function: Funcion correspondiente al turno actua
+        """
         self.phase = phase_name
         print(f"{player.name} está en la fase de {phase_name}.")
+
+        # Ejecutamos la FUNCION DE FASE DEL TURNO de la fase actual, listadas debajo
         phase_function(player)
+
         while True:
             self.priority_cycle()
             advance = input(f"{player.name}, ¿quieres pasar a la siguiente fase? (s/n): ")
             if advance.lower() == "s":
                 break
-    
+
+###################################### FUNCIONES DE FASE DEL TURNO
+
     def untap_phase(self, player: Player):
         """Fase de enderezar: Se enderezan todas las permanentes del jugador."""
         self.phase = "Untap"
-        #print(f"{player.name} está en la fase de Enderezar.")
+        self.check_state_based_actions()
     
     def upkeep_phase(self, player: Player):
         """Fase de mantenimiento: Se resuelven habilidades disparadas."""
         self.phase = "Upkeep"
-        #print(f"{player.name} está en la fase de Mantenimiento.")
+        self.check_state_based_actions()
     
     def draw_phase(self, player: Player):
         """Fase de robo: El jugador roba una carta o pierde si su biblioteca está vacía."""
         self.phase = "Draw"
-        if not player.library:
-            print(f"{player.name} intenta robar pero su biblioteca está vacía. {player.name} ha perdido la partida.")
-            self.players.remove(player)
-        else:
-            player.draw_card()
-            print(f"{player.name} ha robado una carta.")
+        player.draw_card()
         self.check_state_based_actions()
         self.check_triggered_abilities("draw", player)
     
     def main_phase(self, player: Player, phase: str):
         """Fase principal: Se pueden jugar tierras, lanzar hechizos y activar habilidades."""
         self.phase = phase
-        #print(f"{player.name} está en la {phase}.")
         self.check_state_based_actions()
         self.check_triggered_abilities("main_phase", player)
     
     def combat_phase(self, player: Player):
         """Fase de combate: Se declara ataque y bloqueos."""
         self.phase = "Combat"
-        #print(f"{player.name} está en la fase de combate.")
         self.check_state_based_actions()
         self.check_triggered_abilities("main_phase", player)
     
     def end_phase(self, player: Player):
         """Fase final: Se resuelven efectos de final de turno y se descartan cartas si es necesario."""
         self.phase = "End"
-        #print(f"{player.name} está en la fase de final de turno.")
         self.check_state_based_actions()
         self.check_triggered_abilities("main_phase", player)
-    
-    def is_game_over(self) -> bool:
-        """Verifica si la partida ha terminado."""
-        return len(self.players) <= 1
-    
+
+######################################
+
     def priority_cycle(self):
         """Gestiona la prioridad entre los jugadores para jugar hechizos y habilidades."""
         print(f"Se ha activado el ciclo de prioridad en la fase {self.phase}.")
-        current_player = self.players[self.turn_player_index]  # Jugador en turno
-        players_in_priority_order = self.players[self.turn_player_index:] + self.players[:self.turn_player_index]  # Rota la prioridad
+
+        # Rota la prioridad
+        players_in_priority_order = self.players[self.turn_player_index:] + self.players[:self.turn_player_index]
         
         while True:
             passed_players = 0
@@ -143,62 +142,67 @@ class Game:
         self.check_state_based_actions()
 
     def get_player_action(self, player: Player):
-        """Permite a un jugador jugar un hechizo o activar una habilidad si tiene suficiente maná y cumple las restricciones del juego."""
-        if not player.hand and not any(card.activated_abilities for card in player.battlefield):
-            return None # Si no tiene cartas en la mano ni habilidades disponibles, no puede hacer nada
+        """
+        Permite a un jugador jugar un hechizo o activar una habilidad si tiene suficiente maná y cumple las restricciones del juego.
         
+        :param player: Jugador con la prioridad
+        """
+        # Si el jugador no tiene cartas en la mano ni habilidades activables, no puede hacer nada
+        if not player.hand and not any(card.activated_abilities for card in player.battlefield):
+            return None
+
         while True:
             response = input(f"{player.name}, ¿quieres jugar un hechizo o activar una habilidad? (h/a/n): ")
-            
+
             if response.lower() == 'h':
+
+                # Si e jugador quiere lanzar un hechizo, listamos las cartas de su mano y las mostramos como opciones
                 for i, card in enumerate(player.hand):
                     print(f"{i+1}. {card.name} - {card.card_types}")
                 choice = input(f"Selecciona una carta para jugar (1-{len(player.hand)}): ")
+                
                 if choice.isdigit():
                     index = int(choice) - 1
                     if 0 <= index < len(player.hand):
                         card_to_play = player.hand[index]
 
-                        # Solo se pueden jugar permanentes sin flash en el turno del jugador
-                        if player != self.players[self.turn_player_index]:  # Si no es su turno
-                            if "Instant" not in card_to_play.card_types and "Flash" not in card_to_play.keywords:
-                                print(f"{player.name} solo puede jugar {card_to_play.name} en su propio turno.")
-                                continue  # Volvemos a preguntar
+                        # Primero, verificar si el jugador tiene suficiente maná
+                        if not player.can_pay_mana(card_to_play.mana_cost):
+                            print(f"{player.name} no tiene suficiente maná para jugar {card_to_play.name}.")
+                            continue  # Volver a preguntar al jugador
 
-                        # Verificación de si ya se jugó una tierra este turno antes de meterla en el stack
-                        if "Land" in card_to_play.card_types and player.lands_played_this_turn >= 1:
-                            print(f"{player.name} ya ha jugado una tierra este turno y no puede jugar otra.")
-                            continue   # VOLVEMOS A PREGUNTAR AL JUGADOR
-                    
-                        if player.can_play_card(card_to_play, self.phase):
-                            if player.can_pay_mana(card_to_play.mana_cost):
-                                player.pay_mana(card_to_play.mana_cost)
-                                player.hand.remove(card_to_play)
-                                
-                                # Si la carta es una tierra, actualizamos el contador inmediatamente
-                                if "Land" in card_to_play.card_types:
-                                    player.lands_played_this_turn += 1
+                        # Manejo especial para tierras
+                        if "Land" in card_to_play.card_types:
+                            return self.play_land(player, card_to_play)
 
-                                return StackObject(card=card_to_play, controller=player)
-                            else:
-                                print(f"{player.name} no tiene suficiente maná para jugar {card_to_play.name}.")
-                                continue  
-                        else:
-                            print(f"{player.name} no puede jugar {card_to_play.name} en esta fase.")
-                            continue
+                        # Verificamos si la carta tiene una función específica
+                        play_function = getattr(self, f"play_{card_to_play.name.replace(' ', '_').lower()}", None)
+                        if play_function:
+                            return play_function(player, card_to_play)
+                        
+                        print(f"No hay lógica específica implementada para {card_to_play.name}. No puede jugarse.")
+                        continue  # Volvemos a preguntar
+
+                    # Si el jugador introduce un numero fuera del rango de opciones, le volvemos a preguntar
+                    else:
+                        continue
+                
+                # Si el jugador introduce algo que no sea un numero, le volvemos a preguntar
+                else:
+                    continue
 
             elif response.lower() == 'a':
                 available_cards = [card for card in player.battlefield if card.activated_abilities and not card.is_tapped]
 
                 if not available_cards:
                     print("No hay cartas con habilidades activadas disponibles.")
-                    continue
+                    continue  # Volvemos a preguntar
 
                 for i, card in enumerate(available_cards):
                     print(f"{i+1}. {card.name} - {card.activated_abilities}")
 
                 ability_choice = input(f"Selecciona una habilidad para activar (1-{len(available_cards)}): ")
-                
+
                 if ability_choice.isdigit():
                     index = int(ability_choice) - 1
                     if 0 <= index < len(available_cards):
@@ -212,7 +216,54 @@ class Game:
 
             else:
                 print("Entrada no válida. Debes seleccionar 'h', 'a' o 'n'.")
+
+    def play_land(self, player: Player, card: Card):
+        """Permite a un jugador jugar una tierra, respetando la restricción de una por turno."""
+        print(f"{player.name} intenta jugar {card.name}.")
+        
+        # Verificar si el jugador puede jugar la carta
+        if player.can_play_card(card, self.phase):
+            player.hand.remove(card)
+            player.battlefield.append(card)
+            card.controller = player  # Asignamos el controlador
+            player.lands_played_this_turn += 1  # Marcamos que jugó una tierra
+            print(f"{player.name} juega {card.name}.")
+            return None  # Las tierras no van al stack
+
+        print(f"{player.name} no puede jugar {card.name}.")
+        return None
     
+    def select_target(self, player: Player, valid_types: list = ["Player", "Creature", "Planeswalker"]):
+        """Permite seleccionar un objetivo de los tipos válidos especificados."""
+        valid_targets = []
+
+        if "Player" in valid_types:
+            valid_targets.extend(self.players)  # Agregar jugadores si es un objetivo válido
+        if "Creature" in valid_types or "Planeswalker" in valid_types:
+            for p in self.players:
+                valid_targets.extend([card for card in p.battlefield if any(t in valid_types for t in card.card_types)])
+
+        if not valid_targets:
+            print("No hay objetivos válidos disponibles.")
+            return None
+
+        print("Selecciona un objetivo:")
+        for i, target in enumerate(valid_targets):
+            if isinstance(target, Player):
+                print(f"{i+1}. {target.name} (Jugador)")
+            else:
+                print(f"{i+1}. {target.name} (Criatura de {target.controller.name})")
+
+        choice = input(f"Selecciona un objetivo (1-{len(valid_targets)}): ")
+        
+        if choice.isdigit():
+            index = int(choice) - 1
+            if 0 <= index < len(valid_targets):
+                return valid_targets[index]
+
+        print("Selección inválida.")
+        return None
+
     def check_state_based_actions(self):
         """Verifica y aplica las reglas de State-Based Actions (SBAs)."""
         for player in self.players:
@@ -244,3 +295,38 @@ class Game:
             if action.card.passive_effects:
                 self.apply_passive_effects(action.controller, action.card)
         self.check_state_based_actions()
+
+    def apply_passive_effects(self, player: Player, card):
+        """Aplica los efectos pasivos de una carta cuando entra al campo de batalla."""
+        if not card.passive_effects:
+            return
+
+        for effect, details in card.passive_effects.items():
+            if effect == "buff":
+                for target in self.players:
+                    for creature in target.battlefield:
+                        if "Creature" in creature.card_types:
+                            creature.power += details.get("power", 0)
+                            creature.toughness += details.get("toughness", 0)
+                            print(f"{creature.name} obtiene +{details.get('power', 0)}/+{details.get('toughness', 0)} gracias a {card.name}.")
+    
+
+############################################### CARTAS:
+
+    def play_lightning_bolt(self, player: Player, card: Card):
+        """
+        Instant. Deal 3 damage to any target.
+        """
+    
+        # Permitimos seleccionar cualquier objetivo que pueda recibir daño
+        target = self.select_target(player, valid_types=["Player", "Creature", "Planeswalker"])
+        if not target:
+            print("No se ha seleccionado un objetivo válido.")
+            return None  # No se juega la carta si no tiene target válido
+
+        if player.can_play_card(card, self.phase) and player.can_pay_mana(card.mana_cost):
+            player.pay_mana(card.mana_cost)
+            player.hand.remove(card)
+            return StackObject(card=card, controller=player, target=target) # Metemos el hechizo al stack
+        
+        return None

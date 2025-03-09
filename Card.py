@@ -14,7 +14,8 @@ class Card:
                  keywords: list = None, keyword_actions: list = None, expansion: str = None, rarity: str = None,
                  image: str = None, color_indicator: list = None, expansion_symbol: str = None,
                  collector_number: int = None, flavor_text: str = None, frame_effects: list = None,
-                 passive_effects: dict = None, activated_abilities: list = None, triggered_abilities: dict = None, is_tapped = False):
+                 passive_effects: dict = None, activated_abilities: list = None, triggered_abilities: dict = None, 
+                 is_tapped = False):
         """
         Clase base para representar una carta de Magic: The Gathering.
 
@@ -74,6 +75,7 @@ class Card:
         self.activated_abilities = activated_abilities if activated_abilities else []
         self.triggered_abilities = triggered_abilities if triggered_abilities else {}
         self.is_tapped = is_tapped
+        self.controller = None  # Se asignará cuando la carta entre en el campo de batalla
 
     def __str__(self):
         mana_cost_str = " ".join(f"{k}:{v}" for k, v in self.mana_cost.items() if v > 0)
@@ -94,4 +96,5 @@ class Card:
                 f"Número de coleccionista: {self.collector_number}\n"
                 f"Efectos de marco: {', '.join(self.frame_effects)}\n"
                 f"Tapped: {self.is_tapped}\n"
+                f"Controlador: {self.controller.name}\n"
                 f"{flavor_text_str}")
